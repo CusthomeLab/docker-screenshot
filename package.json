@@ -1,17 +1,26 @@
 {
-  "name": "htmltopdf",
+  "name": "@magelan/docker-screenshot",
   "version": "1.0.0",
-  "description": "custom html2pdf based on puppeteer",
-  "main": "server.js",
+  "description": "Custom puppeteer automation to make screenshot",
+  "private": true,
+  "main": "index.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node index.js",
+    "dev": "DEBUG=1 nodemon yarn start",
+    "test": "yarn run format:check",
+    "format:check": "prettier \"./**/*.{js,json,md}\" --check",
+    "format:fix": "prettier \"./**/*.{js,json,md}\" --write"
   },
   "dependencies": {
-    "body-parser": "^1.18.2",
     "data-urls": "^1.1.0",
-    "express": "^4.16.1",
-    "path": "^0.12.7",
+    "koa": "^2.7.0",
+    "koa-logger": "^3.2.0",
+    "koa-router": "^7.4.0",
     "puppeteer": "^1.3.0",
-    "tmp": "^0.0.33"
+    "winston": "^3.2.1"
+  },
+  "devDependencies": {
+    "nodemon": "^1.18.11",
+    "prettier": "^1.17.0"
   }
 }

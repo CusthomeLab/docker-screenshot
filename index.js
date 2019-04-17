@@ -1,91 +1,107 @@
-/**
- * @see https://github.com/GoogleChrome/puppeteer/issues/422
- */
+'use strict'
 
-'use strict';
+const Koa = require('koa')
+const Router = require('koa-router')
+const puppeteer = require('puppeteer')
+const parseDataURL = require('data-urls')
+const { createLogger, koaLoggerMiddleware } = require('./logger')
 
-const express = require('express');
-const puppeteer = require('puppeteer');
-const parseDataURL = require("data-urls");
+const HTTP_SERVER_PORT = process.env.HTTP_SERVER_PORT || 8080
+const SCREENSHOT_API_ENDPOINT =
+  process.env.HTTP_SERVER_PORT || 'http://localhost:3000'
+const DEBUG = process.env.DEBUG || false
 
-// Constants
-const SCREENSHOT_PORT = 8080;
-const SCREENSHOT_HOST = '0.0.0.0';
+const logger = createLogger(DEBUG)
 
-// App
-const app = express();
+const main = async () => {
+  logger.verbose('Starting puppeteer...')
+  const browser = await puppeteer.launch({
+    headless: true,
+    executablePath:
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    args: [
+      '--remote-debugging-port=9222', // FIXME: to be removed
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+    ],
+  })
+  logger.verbose('Puppeteer started')
 
-app.use(express.json({limit: '50mb'}));
+  const httpServer = new Koa()
+  const httpRouter = new Router()
 
-app.get('/', (req, res) => {
-    res.send('Screen shot maker is ready to rock !\n');
-});
+  httpRouter.get('/', ctx => {
+    ctx.status = 200
+    ctx.body = 'Screenshot maker is ready to 📸!\n'
+  })
 
-app.get('/screenshot', async (req, res) => {
-
-
-    let target='http://localhost:3000/screenshot/'+req.query.lotId+'?defaultProducts=0&decorativeProducts=0&size=528';
-
-    console.log('Making sreenshot for : ' + target);
-    let start = Date.now();
-
-    const browser = await puppeteer.launch({
-        headless: false,
-        executablePath: '/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome',
-        args: [
-            '--remote-debugging-port=9222',
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu'
-        ]
-    });
-    const page = await browser.newPage();
-
-    /**
-     * Define a window.onCustomEvent function on the page.
-     */
-    await page.exposeFunction('onCustomEvent', async e => {
-        console.log(`${e.type} fired`);
-
-        await page.waitFor(120000);
-
-        browser.close();
-
-        const screenshotDataURI = parseDataURL(e.detail.dataURI);
-
-        res.type('png');
-
-        res.writeHead(200, {
-            'Content-Type': screenshotDataURI.mimeType.toString(),
-            // 'Content-Length': screenshotDataURI.body.length // FIXME:
-        });
-
-
-        res.write(screenshotDataURI.body,'binary');
-        res.end(null, 'binary');
-
-
-    });
-
-    /**
-     * Attach an event listener to page to capture a custom event on page load/navigation.
-     * @param {string} type Event name.
-     * @return {!Promise}
-     */
-    function listenFor(type) {
-        return page.evaluateOnNewDocument(type => {
-            document.addEventListener(type, e => {
-                window.onCustomEvent({type, detail: e.detail});
-            });
-        }, type);
+  httpRouter.get('/screenshot/:lotId/preview', async (ctx, next) => {
+    const lotId = ctx.params.lotId
+    if (!lotId) {
+      ctx.throw(400, 'The lotId parameter is missing or falsy')
     }
 
-    await listenFor('screenshotTaken');
+    const page = await browser.newPage()
+    logger.silly('New browser page openned')
 
-    await page.goto(target, {waitUntil: 'networkidle0'});
+    return new Promise(async (resolve, reject) => {
+      page.on('pageerror', err => {
+        console.log(err)
+        logger.error('Page error: ' + err.toString())
+        reject(err)
+      })
 
-});
+      page.on('error', err => {
+        logger.error('Error: ' + err.toString())
+        reject(err)
+      })
 
-app.listen(SCREENSHOT_PORT, SCREENSHOT_HOST);
-console.log(`Running on http://${SCREENSHOT_HOST}:${SCREENSHOT_PORT}`);
+      await page.exposeFunction('onScreenshotTakenListener', async e => {
+        logger.silly(`onScreenshotTakenListener triggered`)
+
+        const screenshotDataURI = parseDataURL(e.detail.dataURI)
+
+        resolve({
+          mimeType: screenshotDataURI.mimeType.toString(),
+          body: screenshotDataURI.body,
+        })
+      })
+
+      await page.evaluateOnNewDocument(() => {
+        document.addEventListener('screenshotTaken', event => {
+          window.onScreenshotTakenListener({
+            detail: event.detail,
+          })
+        })
+      })
+
+      const target = `${SCREENSHOT_API_ENDPOINT}/screenshot/${lotId}?defaultProducts=0&decorativeProducts=0&size=528`
+      logger.silly(`Go to: ${target}`)
+      await page.goto(target /*{ waitUntil: 'networkidle0' }*/) // TODO: Do we need that back?
+    })
+      .then(({ mimeType, body }) => {
+        ctx.status = 200
+        ctx.type = mimeType
+        ctx.body = body
+      })
+      .finally(async () => {
+        await page.close()
+        logger.silly('Browser page closed')
+      })
+  })
+
+  logger.verbose('Starting HTTP server...')
+  httpServer.use(koaLoggerMiddleware(logger))
+  httpServer.use(httpRouter.routes())
+  httpServer.use(httpRouter.allowedMethods())
+  httpServer.listen(HTTP_SERVER_PORT)
+  logger.verbose(
+    `HTTP server running and listening on port ${HTTP_SERVER_PORT}`,
+  )
+
+  logger.info(`Ready to work at http://0.0.0.0:${HTTP_SERVER_PORT}`)
+}
+
+main()

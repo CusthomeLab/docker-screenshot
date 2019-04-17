@@ -6,7 +6,7 @@ USER pptruser
 
 COPY package*.json ./
 
-RUN yarn install
+RUN yarn install --frozen-lockfile
 
 COPY . /app
 
