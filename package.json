@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "DEBUG=1 nodemon yarn start",
+    "dev": "DEBUG='true' nodemon yarn start",
     "test": "yarn run format:check",
     "format:check": "prettier \"./**/*.{js,json,md}\" --check",
     "format:fix": "prettier \"./**/*.{js,json,md}\" --write"
