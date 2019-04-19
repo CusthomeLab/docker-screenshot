@@ -25,12 +25,12 @@ module.exports = {
   },
   koaLoggerMiddleware: logger =>
     koaLogger((str, args) => {
-      const [inOutArrow, method, path, status, executionTime, foo] = args
+      const [direction, method, url, status, executionTime, length] = args
 
       if (status && status >= 500) {
         logger.error(str)
       } else {
-        logger.http(str.trimLeft())
+        logger.http(str)
       }
     }),
 }
