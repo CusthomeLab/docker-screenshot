@@ -38,6 +38,7 @@ const main = async () => {
 
       // Docker related arguments
       ...[
+        // FIXME: We should not need to exit the sandbox
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--enable-logging',
@@ -133,7 +134,7 @@ const main = async () => {
         })
       })
 
-      const target = `${SCREENSHOT_API_ENDPOINT}/screenshot/${lotId}?defaultProducts=0&decorativeProducts=1&size=528`
+      const target = `${SCREENSHOT_API_ENDPOINT}/screenshot/${lotId}?defaultProducts=1&decorativeProducts=1&size=528`
       logger.silly(`Going to: ${target}`)
       await page.goto(target)
 
