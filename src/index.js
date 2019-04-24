@@ -12,18 +12,9 @@ const HTTP_SERVER_PORT = process.env.HTTP_SERVER_PORT || 8080
 const SCREENSHOT_API_ENDPOINT =
   process.env.SCREENSHOT_API_ENDPOINT || 'http://localhost:3000'
 const DEBUG = process.env.DEBUG === 'true' || false
-// const NODE_DEBUG =
-//   typeof v8debug === 'object' ||
-//   /--debug|--inspect/.test(process.execArgv.join(' '))
 
 const main = async () => {
   const logger = createLogger(DEBUG)
-
-  // if (NODE_DEBUG) {
-  //   logger.warm(
-  //     'Node run in debug mode, you shoul be able to debug puppeteer on port 9222',
-  //   )
-  // }
 
   const puppeteerConfigurations = {
     headless: false, // We disable here the headless mode to activate it throught the `args` (see https://github.com/GoogleChrome/puppeteer/issues/1260#issuecomment-348878456)
@@ -31,45 +22,19 @@ const main = async () => {
     args: [
       ...puppeteer
         .defaultArgs()
-        .filter(oneArgument => oneArgument !== '--disable-gpu'),
+        .filter(oneArgument => oneArgument !== '--disable-gpu')
+        .filter(oneArgument => oneArgument !== '--disable-dev-shm-usage'),
 
       // Allow WebGL in headless mode (see https://github.com/GoogleChrome/puppeteer/issues/1260#issuecomment-348878456)
-      ...['--headless', '--hide-scrollbars', '--mute-audio'],
+      ...['--headless', '--hide-scrollbars', '--mute-audio', '--enable-webgl'],
 
       // Docker related arguments
       ...[
-        // FIXME: We should not need to exit the sandbox
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--enable-logging',
         '--v=1',
       ],
-
-      // WebGL arguments
-      /**
-       * @see:
-       *  - https://github.com/alixaxel/chrome-aws-lambda/issues/30
-       *  - https://github.com/adieuadieu/serverless-chrome/issues/108#issuecomment-414691876
-       *  - https://doc.babylonjs.com/how_to/render_scene_on_a_server
-       *  - https://bugs.chromium.org/p/chromium/issues/detail?id=617551
-       *
-       * To summarize my digging:
-       *  - Chrome headless only support software WebGL emulation for now (with SwiftShader library)
-       *  - Some work is in progress to support hardware WebGL: https://bugs.chromium.org/p/chromium/issues/detail?id=765284
-       *  - Not having hardware is not an issue, in docker we do not have GPU virtualization easily (and CPU is cheap)
-       *  - We will have to have SwiftShader in the container
-       *  - And maybe to use one of the `--use-gl=swiftshader-webgl` or `--use-gl=swiftshader` arguments
-       */
-      ...[
-        '--enable-webgl',
-        // '--use-gl=swiftshader-webgl',
-        // '--use-gl=swiftshader',
-        // '--use-gl=egl',
-        // '--disable-dev-shm-usage', // FIXME: We not disable the shm memory usage, it's the one used by docker
-      ],
-
-      // Debugging arguments
-      // ...(NODE_DEBUG ? ['--remote-debugging-port=9222'] : []),
     ],
   }
 
@@ -99,7 +64,6 @@ const main = async () => {
     logger.silly('New browser page openned')
 
     return new Promise(async (resolve, reject) => {
-      debugger // FIXME:
       const timeoutId = setTimeout(() => {
         reject(new ScreenshotNotTakenInTime())
       }, 60 * 1000)
@@ -137,19 +101,6 @@ const main = async () => {
       const target = `${SCREENSHOT_API_ENDPOINT}/screenshot/${lotId}?defaultProducts=1&decorativeProducts=1&size=528`
       logger.silly(`Going to: ${target}`)
       await page.goto(target)
-
-      // const webgl = await page.evaluate(() => {
-      //   const canvas = document.createElement('canvas')
-      //   const gl = canvas.getContext('webgl')
-      //   const expGl = canvas.getContext('experimental-webgl')
-
-      //   return {
-      //     gl: gl && gl instanceof WebGLRenderingContext,
-      //     expGl: expGl && expGl instanceof WebGLRenderingContext,
-      //   }
-      // })
-
-      // logger.info('WebGL Support:', webgl)
     })
       .then(async ({ mimeType, body }) => {
         ctx.status = 200
@@ -171,20 +122,6 @@ const main = async () => {
   })
 
   if (DEBUG) {
-    httpRouter.get('/capabilities/webgl.png', async ctx => {
-      const page = await browser.newPage()
-      await page.goto('https://alteredqualia.com/tools/webgl-features/', {
-        waitUntil: 'networkidle0',
-      })
-
-      const screenshot = await page.screenshot({ type: 'png', fullPage: true })
-      await browser.close()
-
-      ctx.status = 200
-      ctx.type = 'image/png'
-      ctx.body = screenshot
-    })
-
     httpRouter.get('/capabilities/webgl.html', async ctx => {
       const page = await browser.newPage()
       await page.goto('https://alteredqualia.com/tools/webgl-features/', {

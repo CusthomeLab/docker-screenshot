@@ -1,63 +1,48 @@
+# Dockerfile inspired by https://github.com/GoogleChromeLabs/lighthousebot/blob/master/builder/Dockerfile
 FROM node:8-stretch-slim as puppeteer-runner
 
 RUN apt-get -y update \
-    && apt-get install -y --no-install-recommends \
-        gconf-service libasound2 libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 \
-        libexpat1 libfontconfig1 libgcc1 libgconf-2-4 libgdk-pixbuf2.0-0 libglib2.0-0 libgtk-3-0 libnspr4 \
-        libpango-1.0-0 libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 \
-        libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 \
-        fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst ttf-freefont \
-        ca-certificates fonts-liberation libappindicator1 libnss3 lsb-release xdg-utils wget \
-        xvfb xauth \
-        procps \
+    && apt-get install -y --no-install-recommends wget xvfb xauth \
     \
-    && wget https://github.com/Yelp/dumb-init/releases/download/v1.2.1/dumb-init_1.2.1_amd64.deb \
-    && dpkg -i dumb-init_*.deb \
-    && rm -f dumb-init_*.deb \
+    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
+    && apt-get -y update \
+    && apt-get install -y google-chrome-unstable --no-install-recommends \
     \
     && apt-get clean \
     && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /src/*.deb
 
-RUN yarn global add puppeteer@1.14.0 \
-    && yarn cache clean
+ADD https://github.com/Yelp/dumb-init/releases/download/v1.2.2/dumb-init_1.2.2_amd64 /usr/local/bin/dumb-init
+RUN chmod +x /usr/local/bin/dumb-init
 
-ENV NODE_PATH="/usr/local/share/.config/yarn/global/node_modules:${NODE_PATH}"
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH='/usr/bin/google-chrome'
 
-RUN groupadd -r pptruser \
-    && useradd -r -g pptruser -G audio,video pptruser
+RUN groupadd --system chrome \
+    && useradd --system --create-home --gid chrome --groups audio,video chrome \
+    && mkdir --parents /home/chrome \
+    && chown --recursive chrome:chrome /home/chrome \
+    \
+    && mkdir /app \
+    && chown -R chrome:chrome /app
 
 # Set language to UTF8
 ENV LANG="C.UTF-8"
-
+USER chrome
 WORKDIR /app
 
-# Add user so we don't need --no-sandbox.
-RUN mkdir /screenshots \
-	&& mkdir -p /home/pptruser/Downloads \
-    && chown -R pptruser:pptruser /home/pptruser \
-    && chown -R pptruser:pptruser /usr/local/share/.config/yarn/global/node_modules \
-    && chown -R pptruser:pptruser /screenshots \
-    && chown -R pptruser:pptruser /app
+ENTRYPOINT ["dumb-init", "--", "xvfb-run", "-a", "--server-args=\"-screen 0 1600x1200x32\""]
 
-# Run everything after as non-privileged user.
-# FIXME:
-# USER pptruser
-
-ENTRYPOINT ["dumb-init", "--"]
-# CMD ["xvfb-run", "-a", "--server-args=\"-screen 0 1600x1200x32\""","node", "index.js"]
-# CMD ["node", "index.js"]
-
-FROM puppeteer-runner as puppeteer-server
-WORKDIR /app
-COPY . ./
-RUN yarn install --production --frozen-lockfile && \
-    yarn cache clean
-# RUN chmod +x /app/src/pwouet.sh
+FROM puppeteer-runner as screenshot-server
+COPY --chown=chrome:chrome . ./
+RUN yarn install --production --frozen-lockfile \
+    && yarn cache clean
 EXPOSE 8080
 ENV HTTP_SERVER_PORT="8080"
 ENV SCREENSHOT_API_ENDPOINT="http://0.0.0.0:3000"
 ENV DEBUG="true"
 HEALTHCHECK CMD curl --fail http://localhost:8080/health || exit 1
 
-CMD ["xvfb-run", "-a", "--server-args=\"-screen 0 1600x1200x32\"", "node", "index.js"]
+CMD ["yarn", "--silent", "start"]
