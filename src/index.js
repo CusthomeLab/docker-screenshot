@@ -5,12 +5,12 @@ const Router = require('koa-router')
 const puppeteer = require('puppeteer')
 const parseDataURL = require('data-urls')
 const stripScripts = require('strip-scripts')
+const { URL } = require('url')
+const queryString = require('querystring')
 const { createLogger, koaLoggerMiddleware } = require('./logger')
 const ScreenshotNotTakenInTime = require('./ScreenshotNotTakenInTime')
 
 const HTTP_SERVER_PORT = process.env.HTTP_SERVER_PORT || 8080
-const SCREENSHOT_API_ENDPOINT =
-  process.env.SCREENSHOT_API_ENDPOINT || 'http://localhost:3000'
 const DEBUG = process.env.DEBUG === 'true' || false
 
 const main = async () => {
@@ -54,11 +54,17 @@ const main = async () => {
     ctx.body = 'Screenshot maker is ready to 📸!\n'
   })
 
-  httpRouter.get('/screenshot/:lotId/preview', async (ctx, next) => {
-    const lotId = ctx.params.lotId
-    if (!lotId) {
-      ctx.throw(400, 'The lotId parameter is missing or falsy')
+  httpRouter.get('/screenshot', async (ctx, next) => {
+    const queryStringParameters = queryString.parse(ctx.querystring)
+    const targetRaw = queryStringParameters.target
+    if (!targetRaw) {
+      ctx.throw(
+        400,
+        'The target parameter is missing (or falsy) in the query string',
+      )
     }
+
+    const targetUrl = new URL(targetRaw)
 
     const page = await browser.newPage()
     logger.silly('New browser page openned')
@@ -98,20 +104,20 @@ const main = async () => {
         })
       })
 
-      const target = `${SCREENSHOT_API_ENDPOINT}/screenshot/${lotId}?defaultProducts=1&decorativeProducts=1&size=528`
-      logger.silly(`Going to: ${target}`)
-      await page.goto(target)
+      logger.info(
+        `Visit "${targetUrl.toString()}" and wait for a screenshot to be taken`,
+      )
+      await page.goto(targetUrl.toString())
     })
-      .then(async ({ mimeType, body }) => {
+      .then(({ mimeType, body }) => {
         ctx.status = 200
         ctx.type = mimeType
         ctx.body = body
       })
-      .catch(async err => {
-        logger.error(err)
-        ctx.throw(500)
+      .catch(err => {
+        ctx.throw(500, err)
       })
-      .then(async () => {
+      .finally(async () => {
         await page.close()
         logger.silly('Browser page closed')
       })
@@ -147,9 +153,6 @@ const main = async () => {
   )
 
   logger.info(`Ready to work at http://0.0.0.0:${HTTP_SERVER_PORT}`)
-  logger.info(
-    `Will use the screenshot API located at "${SCREENSHOT_API_ENDPOINT}"`,
-  )
   logger.info(`Debug: "${DEBUG}"`)
 }
 
