@@ -1,5 +1,5 @@
 # Dockerfile inspired by https://github.com/GoogleChromeLabs/lighthousebot/blob/master/builder/Dockerfile
-FROM node:8-stretch-slim as puppeteer-runner
+FROM node:10-stretch-slim as puppeteer-runner
 
 RUN apt-get -y update \
     && apt-get install -y --no-install-recommends wget xvfb xauth \
