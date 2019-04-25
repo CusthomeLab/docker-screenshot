@@ -67,6 +67,8 @@ const main = async () => {
     const targetUrl = new URL(targetRaw)
 
     const page = await browser.newPage()
+    page.setCacheEnabled(true)
+    
     logger.silly('New browser page openned')
 
     return new Promise(async (resolve, reject) => {
