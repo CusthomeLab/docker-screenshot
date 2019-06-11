@@ -22,8 +22,8 @@ const main = async () => {
     args: [
       ...puppeteer
         .defaultArgs()
-        .filter(oneArgument => oneArgument !== '--disable-gpu')
-        .filter(oneArgument => oneArgument !== '--disable-dev-shm-usage'),
+        .filter(oneArgument => oneArgument !== '--disable-gpu'),
+        // .filter(oneArgument => oneArgument !== '--disable-dev-shm-usage'),
 
       // Allow WebGL in headless mode (see https://github.com/GoogleChrome/puppeteer/issues/1260#issuecomment-348878456)
       ...['--headless', '--hide-scrollbars', '--mute-audio', '--enable-webgl'],
@@ -68,7 +68,7 @@ const main = async () => {
 
     const page = await browser.newPage()
     page.setCacheEnabled(true)
-    
+
     logger.silly('New browser page openned')
 
     return new Promise(async (resolve, reject) => {
