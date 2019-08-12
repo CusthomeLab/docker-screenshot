@@ -43,4 +43,6 @@ EXPOSE 8080
 ENV DEBUG="false"
 HEALTHCHECK CMD curl --fail http://localhost:8080/health || exit 1
 
+ENV SENTRY_DSN=""
+
 CMD ["yarn", "--silent", "start"]

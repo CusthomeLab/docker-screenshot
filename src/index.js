@@ -7,11 +7,13 @@ const parseDataURL = require('data-urls')
 const stripScripts = require('strip-scripts')
 const { URL } = require('url')
 const queryString = require('querystring')
+const Sentry = require('@sentry/node')
 const { createLogger, koaLoggerMiddleware } = require('./logger')
 const ScreenshotNotTakenInTime = require('./ScreenshotNotTakenInTime')
 
 const HTTP_SERVER_PORT = process.env.HTTP_SERVER_PORT || 8080
 const DEBUG = process.env.DEBUG === 'true' || false
+const SENTRY_DSN = process.env.SENTRY_DSN || false
 
 const main = async () => {
   const logger = createLogger(DEBUG)
@@ -23,7 +25,7 @@ const main = async () => {
       ...puppeteer
         .defaultArgs()
         .filter(oneArgument => oneArgument !== '--disable-gpu'),
-        // .filter(oneArgument => oneArgument !== '--disable-dev-shm-usage'),
+      // .filter(oneArgument => oneArgument !== '--disable-dev-shm-usage'),
 
       // Allow WebGL in headless mode (see https://github.com/GoogleChrome/puppeteer/issues/1260#issuecomment-348878456)
       ...['--headless', '--hide-scrollbars', '--mute-audio', '--enable-webgl'],
@@ -48,6 +50,23 @@ const main = async () => {
 
   const httpServer = new Koa()
   const httpRouter = new Router()
+
+  if (SENTRY_DSN) {
+    Sentry.init({
+      dsn: SENTRY_DSN,
+    })
+
+    httpServer.on('error', (err, ctx) => {
+      Sentry.withScope(scope => {
+        scope.addEventProcessor(event =>
+          Sentry.Handlers.parseRequest(event, ctx.request),
+        )
+        Sentry.captureException(err)
+      })
+    })
+  } else {
+    logger.warning('No error reporting configuration given')
+  }
 
   httpRouter.get('/', ctx => {
     ctx.status = 200
@@ -149,6 +168,7 @@ const main = async () => {
   httpServer.use(koaLoggerMiddleware(logger))
   httpServer.use(httpRouter.routes())
   httpServer.use(httpRouter.allowedMethods())
+
   httpServer.listen(HTTP_SERVER_PORT)
   logger.verbose(
     `HTTP server running and listening on port ${HTTP_SERVER_PORT}`,
