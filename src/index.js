@@ -65,7 +65,7 @@ const main = async () => {
       })
     })
   } else {
-    logger.warning('No error reporting configuration given')
+    logger.warn('No error reporting configuration given')
   }
 
   httpRouter.get('/', ctx => {
