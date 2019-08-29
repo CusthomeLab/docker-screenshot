@@ -10,6 +10,7 @@ const queryString = require('querystring')
 const Sentry = require('@sentry/node')
 const { createLogger, koaLoggerMiddleware } = require('./logger')
 const ScreenshotNotTakenInTime = require('./ScreenshotNotTakenInTime')
+const requestToJson = require('./requestToJson')
 
 const HTTP_SERVER_PORT = process.env.HTTP_SERVER_PORT || 8080
 const DEBUG = process.env.DEBUG === 'true' || false
@@ -98,6 +99,18 @@ const main = async () => {
       page.on('pageerror', err => {
         logger.error('Page error: ' + err.toString())
         reject(err)
+      })
+
+      page.on('requestfailed', request => {
+        logger.error(
+          'Request failed: ' + JSON.stringify(requestToJson(request)),
+        )
+      })
+
+      page.on('requestfinished', request => {
+        logger.debug(
+          'Network request: ' + JSON.stringify(requestToJson(request)),
+        )
       })
 
       page.on('error', err => {
