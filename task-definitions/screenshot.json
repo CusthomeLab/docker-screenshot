@@ -1,0 +1,27 @@
+[
+  {
+    "entryPoint": [],
+    "portMappings": [
+      {
+        "hostPort": 80,
+        "protocol": "tcp",
+        "containerPort": 8080
+      }
+    ],
+    "command": [],
+    "environment": [
+      {
+        "name": "SENTRY_DSN",
+        "value": "https://e5e385db6ed64cc6ab2019831cdfd1b1@sentry.vixns.net/226"
+      }
+    ],
+    "mountPoints": [],
+    "memoryReservation": 1500,
+    "volumesFrom": [],
+    "image": "162094205814.dkr.ecr.eu-west-3.amazonaws.com/custhome/docker-screenshot:latest",
+    "disableNetworking": null,
+    "essential": true,
+    "links": [],
+    "name": "screenshot-container"
+  }
+]
