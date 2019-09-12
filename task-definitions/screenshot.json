@@ -16,12 +16,21 @@
       }
     ],
     "mountPoints": [],
-    "memoryReservation": 1500,
+    "memoryReservation": 256,
     "volumesFrom": [],
     "image": "162094205814.dkr.ecr.eu-west-3.amazonaws.com/custhome/docker-screenshot:latest",
     "disableNetworking": null,
     "essential": true,
     "links": [],
-    "name": "screenshot-container"
+    "name": "screenshot-container",
+    "logConfiguration": {
+      "logDriver": "awslogs",
+      "options": {
+        "awslogs-create-group" : "true",
+        "awslogs-group" : "awslogs-screenshot",
+        "awslogs-region": "eu-west-3",
+        "awslogs-stream-prefix": "ecs"
+      }
+    }
   }
 ]
