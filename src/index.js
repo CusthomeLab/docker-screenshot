@@ -94,7 +94,7 @@ const main = async () => {
     return new Promise(async (resolve, reject) => {
       const timeoutId = setTimeout(() => {
         reject(new ScreenshotNotTakenInTime())
-      }, 60 * 1000)
+      }, 120 * 1000)
 
       page.on('pageerror', err => {
         logger.error('Page error: ' + err.toString())
