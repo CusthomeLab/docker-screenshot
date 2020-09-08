@@ -24,7 +24,7 @@
     "winston": "^3.2.1"
   },
   "devDependencies": {
-    "http-proxy": "^1.17.0",
+    "http-proxy": "^1.18.1",
     "nodemon": "^1.18.11",
     "prettier": "^1.17.0"
   }
